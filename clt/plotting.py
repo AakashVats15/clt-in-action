@@ -120,32 +120,50 @@ def qq_plot(
     ax: Optional[plt.Axes] = None,
     title: Optional[str] = None,
     filename: Optional[str] = None,
+    max_points: int = 20000,
 ) -> None:
     """
-    Create a QQ-plot of `data` against a standard normal distribution.
+    QQ-plot of `data` against a standard normal distribution.
+    Subsamples if data is very large to keep plotting responsive.
     """
+    from scipy.stats import norm
+
     x = _to_1d_array(data)
+    n_total = x.size
+    if n_total == 0:
+        return
+
+    # Subsample large datasets
+    if n_total > max_points:
+        rng = np.random.default_rng(0)
+        idx = rng.choice(n_total, size=max_points, replace=False)
+        x = x[idx]
+
     x_sorted = np.sort(x)
     n = x_sorted.size
-    # theoretical quantiles
+
+    # Theoretical quantiles from standard normal
     probs = (np.arange(1, n + 1) - 0.5) / n
-    theo_q = np.sqrt(2) * np.erfinv(2 * probs - 1)  # inverse CDF of standard normal
+    theo_q = norm.ppf(probs)
+
     fig, ax_local = (plt.subplots(figsize=(6, 6)) if ax is None else (None, ax))
     ax_plot = ax_local if ax is None else ax
+
     ax_plot.scatter(theo_q, x_sorted, s=10, alpha=0.6)
-    # reference line
+
     slope = np.std(x_sorted, ddof=1)
     intercept = np.mean(x_sorted)
     xs = np.array([theo_q.min(), theo_q.max()])
     ax_plot.plot(xs, intercept + slope * xs, color="red", lw=1.5, label="Reference")
+
     ax_plot.set_xlabel("Theoretical quantiles (Normal)")
     ax_plot.set_ylabel("Sample quantiles")
     if title:
         ax_plot.set_title(title)
     ax_plot.legend()
+
     if ax is None:
         save_or_show(fig, filename)
-
 
 # ---------------------------
 # Time series / GBM plotting
