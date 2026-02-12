@@ -49,9 +49,6 @@ clt-in-action/
 │   ├── communications.md
 │   └── antennas.md
 │
-├── tests/
-│   └── test_core.py
-│
 ├── plots/                      
 ├── README.md
 └── requirements.txt
