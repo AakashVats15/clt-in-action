@@ -11,8 +11,8 @@ import sys
 import pathlib
 import numpy as np
 from scipy.stats import norm
+from datetime import datetime
 
-# Ensure repo root is on path
 repo_root = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(repo_root))
 
@@ -25,10 +25,11 @@ from clt.core import (
 from clt.distributions import get_distribution
 from clt import plotting
 
-# Default output directory for plots
-OUT_DIR = os.path.join(os.path.dirname(__file__), "plots")
-os.makedirs(OUT_DIR, exist_ok=True)
-
+# Create timestamped plot directory
+timestamp = datetime.now().strftime("%Y%m%d_%H-%M")
+script_name = "Basic_CLT"
+OUT_DIR = repo_root / "plots" / f"{script_name}-{timestamp}"
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 def _seed_rng(seed: int | None) -> np.random.Generator:
     return np.random.default_rng(seed)
