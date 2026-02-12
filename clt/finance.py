@@ -79,6 +79,40 @@ def simulate_gbm(
     paths = s0 * np.exp(log_paths)
     return GBMResult(times=times, paths=paths)
 
+def simulate_gbm_paths(
+    n_assets: int,
+    n_paths: int,
+    n_steps: int,
+    T: float,
+    mu: float,
+    sigma: float,
+    rng: RNG | None = None,
+) -> tuple[Array, Array]:
+    """
+    Multi-asset GBM with identical mu/sigma for each asset.
+    Returns (times, paths) where:
+    - times: shape (n_steps + 1,)
+    - paths: shape (n_paths, n_assets, n_steps + 1)
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+
+    dt = T / n_steps
+    times = np.linspace(0, T, n_steps + 1)
+
+    paths = np.zeros((n_paths, n_assets, n_steps + 1))
+    paths[:, :, 0] = 100.0  # initial price for all assets
+
+    drift = (mu - 0.5 * sigma**2) * dt
+    vol = sigma * np.sqrt(dt)
+
+    for t in range(1, n_steps + 1):
+        shocks = rng.standard_normal(size=(n_paths, n_assets))
+        paths[:, :, t] = paths[:, :, t - 1] * np.exp(drift + vol * shocks)
+
+    return times, paths
+
+
 # Correlated asset simulation
 def simulate_correlated_gbm(
     s0: Sequence[float],
@@ -129,6 +163,27 @@ def simulate_correlated_gbm(
     return GBMResult(times=times, paths=paths)  # note: paths shape (n_paths, m, n_steps+1)
 
 
+def compute_log_returns(paths: Array) -> Array:
+    return np.log(paths[:, :, 1:] / paths[:, :, :-1])
+
+
+def compute_covariance_matrix(log_returns: Array) -> Array:
+    n_paths, n_assets, n_steps = log_returns.shape
+    flat = log_returns.transpose(0, 2, 1).reshape(-1, n_assets)
+    return np.cov(flat, rowvar=False)
+
+def compute_var_cvar(returns: Array, alpha: float = 0.95) -> tuple[float, float]:
+    r = np.asarray(returns, dtype=float)
+    if r.ndim > 1:
+        r = r.flatten()
+
+    r = np.sort(r)
+    idx = int((1 - alpha) * len(r))
+    var = r[idx]
+    cvar = r[:idx].mean() if idx > 0 else var
+    return float(var), float(cvar)
+
+
 # Portfolio calculations
 def portfolio_returns_from_weights(
     asset_returns: Array,
@@ -147,6 +202,9 @@ def portfolio_returns_from_weights(
     else:
         raise ValueError("asset_returns must be 2D and compatible with weights length")
 
+def compute_portfolio_returns(log_returns: Array, weights: Array) -> Array:
+    w = np.asarray(weights)
+    return np.einsum("p a t, a -> p t", log_returns, w)
 
 def portfolio_statistics(
     returns: Array,
