@@ -530,3 +530,138 @@ def simulate_bpsk_receiver_chain(
     rx_eq = rx / channel_gain
     bits_hat = bpsk_demod(rx_eq.real)
     return rx_eq, bits_hat
+
+# -----------------------------
+# AWGN Channel (complex)
+# -----------------------------
+def awgn_channel(x: Array, snr_db: float, rng: RNG) -> Array:
+    snr_linear = 10 ** (snr_db / 10)
+    power = np.mean(np.abs(x) ** 2)
+    noise_var = power / snr_linear
+    noise = (rng.normal(0, np.sqrt(noise_var / 2), size=x.shape) +
+             1j * rng.normal(0, np.sqrt(noise_var / 2), size=x.shape))
+    return x + noise
+
+
+# -----------------------------
+# QPSK
+# -----------------------------
+def qpsk_modulate(bits: Array) -> Array:
+    b = bits.reshape(-1, 2)
+    return (1 - 2*b[:,0]) + 1j*(1 - 2*b[:,1])
+
+
+def qpsk_demodulate(symbols: Array) -> Array:
+    b0 = (symbols.real < 0).astype(int)
+    b1 = (symbols.imag < 0).astype(int)
+    return np.column_stack((b0, b1))
+
+
+# -----------------------------
+# 16QAM
+# -----------------------------
+def qam16_modulate(bits: Array) -> Array:
+    b = bits.reshape(-1, 4)
+    I = (1 - 2*b[:,0]) * (2 - b[:,2])
+    Q = (1 - 2*b[:,1]) * (2 - b[:,3])
+    return I + 1j*Q
+
+
+def qam16_demodulate(symbols: Array) -> Array:
+    I = symbols.real
+    Q = symbols.imag
+    b0 = (I < 0).astype(int)
+    b1 = (Q < 0).astype(int)
+    b2 = (np.abs(I) < 2).astype(int)
+    b3 = (np.abs(Q) < 2).astype(int)
+    return np.column_stack((b0, b1, b2, b3))
+
+
+# -----------------------------
+# 64QAM
+# -----------------------------
+def qam64_modulate(bits: Array) -> Array:
+    b = bits.reshape(-1, 6)
+    I = (1 - 2*b[:,0]) * (4 - 2*b[:,2] - b[:,4])
+    Q = (1 - 2*b[:,1]) * (4 - 2*b[:,3] - b[:,5])
+    return I + 1j*Q
+
+
+def qam64_demodulate(symbols: Array) -> Array:
+    I = symbols.real
+    Q = symbols.imag
+    b0 = (I < 0).astype(int)
+    b1 = (Q < 0).astype(int)
+    b2 = (np.abs(I) < 4).astype(int)
+    b3 = (np.abs(Q) < 4).astype(int)
+    b4 = ((np.abs(I) % 4) < 2).astype(int)
+    b5 = ((np.abs(Q) % 4) < 2).astype(int)
+    return np.column_stack((b0, b1, b2, b3, b4, b5))
+
+
+# -----------------------------
+# Rayleigh fading (flat)
+# -----------------------------
+def rayleigh_fading(n: int, rng: RNG) -> Array:
+    return (rng.normal(0, 1/np.sqrt(2), n) +
+            1j * rng.normal(0, 1/np.sqrt(2), n))
+
+
+# -----------------------------
+# OFDM (IFFT/FFT)
+# -----------------------------
+def ofdm_modulate(symbols: Array, n_subcarriers: int, cp_len: int = 32) -> Array:
+    blocks = symbols.reshape(-1, n_subcarriers)
+    time_blocks = np.fft.ifft(blocks, axis=1)
+    cp = time_blocks[:, -cp_len:]
+    return np.hstack((cp, time_blocks)).reshape(-1)
+
+
+def ofdm_demodulate(signal: Array, n_subcarriers: int, cp_len: int = 32) -> Array:
+    block_len = n_subcarriers + cp_len
+    n_blocks = len(signal) // block_len
+    blocks = signal[:n_blocks*block_len].reshape(n_blocks, block_len)
+    blocks = blocks[:, cp_len:]
+    freq = np.fft.fft(blocks, axis=1)
+    return freq.reshape(-1)
+
+
+# -----------------------------
+# MIMO 2×2 Alamouti STBC
+# -----------------------------
+def mimo_alamouti_encode(symbols: Array) -> tuple[Array, Array]:
+    s0 = symbols[0::2]
+    s1 = symbols[1::2]
+    tx1 = np.zeros_like(symbols, dtype=complex)
+    tx2 = np.zeros_like(symbols, dtype=complex)
+    tx1[0::2] = s0
+    tx1[1::2] = -np.conjugate(s1)
+    tx2[0::2] = s1
+    tx2[1::2] = np.conjugate(s0)
+    return tx1, tx2
+
+
+def mimo_alamouti_decode(r1: Array, r2: Array, h1: Array, h2: Array) -> Array:
+    s0_hat = np.conjugate(h1)*r1 + h2*r2
+    s1_hat = np.conjugate(h2)*r1 - h1*r2
+    denom = np.abs(h1)**2 + np.abs(h2)**2
+    out = np.zeros(r1.shape, dtype=complex)
+    out[0::2] = s0_hat[0::2] / denom[0::2]
+    out[1::2] = s1_hat[1::2] / denom[1::2]
+    return out
+
+
+# -----------------------------
+# BER
+# -----------------------------
+def ber(bits_tx: Array, bits_rx: Array) -> float:
+    return float(np.mean(bits_tx != bits_rx))
+
+
+# -----------------------------
+# PSD (Welch)
+# -----------------------------
+def psd_estimate(signal: Array, fs: float = 1.0):
+    from scipy.signal import welch
+    f, Pxx = welch(signal, fs=fs, nperseg=1024)
+    return f, Pxx

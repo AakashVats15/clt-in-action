@@ -296,3 +296,69 @@ def plot_array_pattern(
         fig, ax = plt.subplots(figsize=(8, 4.5))
         ax.plot(np.degrees(angles_rad), pattern_db)
         ax.set_xlabel("Angle (degrees)")
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+def plot_constellation(symbols, title=None, filename=None):
+    """
+    Scatter plot of complex constellation points.
+    """
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.scatter(symbols.real, symbols.imag, s=8, alpha=0.6)
+    ax.axhline(0, color="gray", lw=1)
+    ax.axvline(0, color="gray", lw=1)
+    ax.set_xlabel("In-phase")
+    ax.set_ylabel("Quadrature")
+    if title:
+        ax.set_title(title)
+    ax.set_aspect("equal", "box")
+
+    if filename:
+        fig.savefig(filename, dpi=150, bbox_inches="tight")
+        plt.close(fig)
+    else:
+        plt.show()
+
+
+def plot_ber_curve(snr_range, bers, title=None, filename=None):
+    """
+    Plot BER vs SNR curve.
+    """
+    fig, ax = plt.subplots(figsize=(7, 5))
+    ax.semilogy(snr_range, bers, marker="o")
+    ax.set_xlabel("SNR (dB)")
+    ax.set_ylabel("Bit Error Rate (BER)")
+    ax.grid(True, which="both", ls="--", alpha=0.6)
+    if title:
+        ax.set_title(title)
+
+    if filename:
+        fig.savefig(filename, dpi=150, bbox_inches="tight")
+        plt.close(fig)
+    else:
+        plt.show()
+
+
+def plot_psd(signal, fs=1.0, title=None, filename=None):
+    """
+    Plot Power Spectral Density using Welch's method.
+    """
+    from scipy.signal import welch
+
+    f, Pxx = welch(signal, fs=fs, nperseg=1024)
+
+    fig, ax = plt.subplots(figsize=(7, 5))
+    ax.semilogy(f, Pxx)
+    ax.set_xlabel("Frequency (Hz)")
+    ax.set_ylabel("PSD")
+    if title:
+        ax.set_title(title)
+    ax.grid(True, which="both", ls="--", alpha=0.6)
+
+    if filename:
+        fig.savefig(filename, dpi=150, bbox_inches="tight")
+        plt.close(fig)
+    else:
+        plt.show()
