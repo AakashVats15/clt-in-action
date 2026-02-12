@@ -54,7 +54,6 @@ clt-in-action/
 │
 ├── plots/                      
 ├── README.md
-├── LICENSE
 └── requirements.txt
 ```
 
